@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { Plus, Edit2, Check, Trash2, Factory, TrendingUp, AlertCircle, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Edit2, Check, Trash2, Factory, TrendingUp, AlertCircle, Settings, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 
 type KPI = {
   id: string;
@@ -18,44 +20,149 @@ const initialKPIs: KPI[] = [
 ];
 
 export default function App() {
-  const [kpis, setKpis] = useState<KPI[]>(initialKPIs);
+  const [kpis, setKpis] = useState<KPI[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<KPI | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!db) {
+      setError("Firebase configuration is missing. Please set up your environment variables.");
+      setLoading(false);
+      return;
+    }
+
+    const kpisRef = collection(db, 'kpis');
+    
+    // Seed initial data if empty
+    const seedData = async () => {
+      try {
+        const snapshot = await getDocs(kpisRef);
+        if (snapshot.empty) {
+          for (const kpi of initialKPIs) {
+            await setDoc(doc(kpisRef, kpi.id), kpi);
+          }
+        }
+      } catch (err) {
+        console.error("Error seeding data:", err);
+        setError("Failed to connect to Firebase. Check your configuration and rules.");
+      }
+    };
+    
+    seedData();
+
+    const unsubscribe = onSnapshot(kpisRef, (snapshot) => {
+      const kpiData: KPI[] = [];
+      snapshot.forEach((doc) => {
+        kpiData.push({ id: doc.id, ...doc.data() } as KPI);
+      });
+      // Sort by name
+      kpiData.sort((a, b) => a.name.localeCompare(b.name));
+      setKpis(kpiData);
+      setLoading(false);
+      setError(null);
+    }, (err) => {
+      console.error(err);
+      setError("Failed to read from Firebase. Check your configuration and rules.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleEdit = (kpi: KPI) => {
     setEditingId(kpi.id);
     setEditForm(kpi);
   };
 
-  const handleSave = () => {
-    if (editForm) {
-      setKpis(kpis.map(k => k.id === editForm.id ? editForm : k));
-      setEditingId(null);
-      setEditForm(null);
+  const handleSave = async () => {
+    if (editForm && db) {
+      try {
+        await setDoc(doc(db, 'kpis', editForm.id), editForm);
+        setEditingId(null);
+        setEditForm(null);
+      } catch (err) {
+        console.error("Error saving document: ", err);
+        alert("Failed to save KPI.");
+      }
     }
   };
 
-  const handleDelete = (id: string) => {
-    setKpis(kpis.filter(k => k.id !== id));
+  const handleDelete = async (id: string) => {
+    if (db) {
+      try {
+        await deleteDoc(doc(db, 'kpis', id));
+      } catch (err) {
+        console.error("Error deleting document: ", err);
+        alert("Failed to delete KPI.");
+      }
+    }
   };
 
-  const handleAdd = () => {
-    const newKpi: KPI = {
-      id: Date.now().toString(),
+  const handleAdd = async () => {
+    if (!db) return;
+    const newKpi = {
       name: 'New KPI',
       value: 0,
       target: 100,
       unit: 'unit'
     };
-    setKpis([...kpis, newKpi]);
-    setEditingId(newKpi.id);
-    setEditForm(newKpi);
+    try {
+      const docRef = await addDoc(collection(db, 'kpis'), newKpi);
+      const kpiWithId = { id: docRef.id, ...newKpi };
+      setEditingId(docRef.id);
+      setEditForm(kpiWithId);
+    } catch (err) {
+      console.error("Error adding document: ", err);
+      alert("Failed to add KPI.");
+    }
   };
 
   const calculateProgress = (value: number, target: number) => {
     if (target === 0) return 0;
     return Math.min(Math.max((value / target) * 100, 0), 100);
   };
+
+  if (!db || error) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
+          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Database size={32} />
+          </div>
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Firebase Setup Required</h2>
+          <p className="text-slate-600 mb-6 text-sm">
+            {error || "To enable real-time syncing, you need to connect this app to a Firebase project."}
+          </p>
+          <div className="text-left bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm font-mono text-slate-700 overflow-x-auto">
+            <p className="font-semibold mb-2 text-slate-900">Required Environment Variables:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>VITE_FIREBASE_API_KEY</li>
+              <li>VITE_FIREBASE_AUTH_DOMAIN</li>
+              <li>VITE_FIREBASE_PROJECT_ID</li>
+              <li>VITE_FIREBASE_STORAGE_BUCKET</li>
+              <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
+              <li>VITE_FIREBASE_APP_ID</li>
+            </ul>
+          </div>
+          <p className="mt-6 text-sm text-slate-500">
+            Add these to your environment variables to continue.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="animate-spin text-indigo-600">
+          <Factory size={32} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
