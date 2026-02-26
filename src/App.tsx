@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Check, Trash2, Factory, TrendingUp, AlertCircle, Settings, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc, addDoc, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 type KPI = {
@@ -20,7 +20,7 @@ const initialKPIs: KPI[] = [
 ];
 
 export default function App() {
-  const [kpis, setKpis] = useState<KPI[]>([]);
+  const [kpis, setKpis] = useState<KPI[]>(initialKPIs);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<KPI | null>(null);
   const [loading, setLoading] = useState(true);
@@ -29,40 +29,42 @@ export default function App() {
   useEffect(() => {
     const kpisRef = collection(db, 'kpis');
     
-    // Seed initial data if empty
-    const seedData = async () => {
-      try {
-        const snapshot = await getDocs(kpisRef);
-        if (snapshot.empty) {
-          for (const kpi of initialKPIs) {
-            await setDoc(doc(kpisRef, kpi.id), kpi);
-          }
-        }
-      } catch (err) {
-        console.error("Error seeding data:", err);
-        setError("Failed to connect to Firebase. Check your configuration and rules.");
-      }
-    };
-    
-    seedData();
+    let isTimeout = false;
+    const timeoutId = setTimeout(() => {
+      isTimeout = true;
+      setError("Could not connect to Firebase. Please ensure you have enabled 'Firestore Database' in your Firebase Console.");
+    }, 5000);
 
     const unsubscribe = onSnapshot(kpisRef, (snapshot) => {
-      const kpiData: KPI[] = [];
-      snapshot.forEach((doc) => {
-        kpiData.push({ id: doc.id, ...doc.data() } as KPI);
-      });
-      // Sort by name
-      kpiData.sort((a, b) => a.name.localeCompare(b.name));
-      setKpis(kpiData);
+      clearTimeout(timeoutId);
+      if (isTimeout) setError(null);
+      
+      if (snapshot.empty) {
+        // Seed initial data if empty
+        initialKPIs.forEach(kpi => {
+          const { id, ...data } = kpi;
+          setDoc(doc(kpisRef, id), data).catch(console.error);
+        });
+      } else {
+        const kpiData: KPI[] = [];
+        snapshot.forEach((doc) => {
+          kpiData.push({ id: doc.id, ...doc.data() } as KPI);
+        });
+        kpiData.sort((a, b) => a.name.localeCompare(b.name));
+        setKpis(kpiData);
+      }
       setLoading(false);
-      setError(null);
     }, (err) => {
+      clearTimeout(timeoutId);
       console.error(err);
-      setError("Failed to read from Firebase. Check your configuration and rules.");
+      setError("Failed to read from Firebase. Please check your Firestore Security Rules (they might be denying read/write access).");
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const handleEdit = (kpi: KPI) => {
@@ -72,42 +74,52 @@ export default function App() {
 
   const handleSave = async () => {
     if (editForm) {
+      // Optimistic update
+      setKpis(prev => {
+        const exists = prev.find(k => k.id === editForm.id);
+        if (exists) {
+          return prev.map(k => k.id === editForm.id ? editForm : k);
+        }
+        return [...prev, editForm];
+      });
+      
+      const kpiToSave = editForm;
+      setEditingId(null);
+      setEditForm(null);
+
       try {
-        await setDoc(doc(db, 'kpis', editForm.id), editForm);
-        setEditingId(null);
-        setEditForm(null);
+        const { id, ...kpiData } = kpiToSave;
+        await setDoc(doc(db, 'kpis', id), kpiData);
       } catch (err) {
         console.error("Error saving document: ", err);
-        alert("Failed to save KPI.");
+        alert("Failed to save KPI to Firebase. Check your Firestore rules.");
       }
     }
   };
 
   const handleDelete = async (id: string) => {
+    // Optimistic delete
+    setKpis(prev => prev.filter(k => k.id !== id));
     try {
       await deleteDoc(doc(db, 'kpis', id));
     } catch (err) {
       console.error("Error deleting document: ", err);
-      alert("Failed to delete KPI.");
+      alert("Failed to delete KPI from Firebase.");
     }
   };
 
-  const handleAdd = async () => {
+  const handleAdd = () => {
+    const newId = doc(collection(db, 'kpis')).id;
     const newKpi = {
+      id: newId,
       name: 'New KPI',
       value: 0,
       target: 100,
       unit: 'unit'
     };
-    try {
-      const docRef = await addDoc(collection(db, 'kpis'), newKpi);
-      const kpiWithId = { id: docRef.id, ...newKpi };
-      setEditingId(docRef.id);
-      setEditForm(kpiWithId);
-    } catch (err) {
-      console.error("Error adding document: ", err);
-      alert("Failed to add KPI.");
-    }
+    setKpis(prev => [...prev, newKpi]);
+    setEditingId(newId);
+    setEditForm(newKpi);
   };
 
   const calculateProgress = (value: number, target: number) => {
