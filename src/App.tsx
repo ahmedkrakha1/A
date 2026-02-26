@@ -27,12 +27,6 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!db) {
-      setError("Firebase configuration is missing. Please set up your environment variables.");
-      setLoading(false);
-      return;
-    }
-
     const kpisRef = collection(db, 'kpis');
     
     // Seed initial data if empty
@@ -77,7 +71,7 @@ export default function App() {
   };
 
   const handleSave = async () => {
-    if (editForm && db) {
+    if (editForm) {
       try {
         await setDoc(doc(db, 'kpis', editForm.id), editForm);
         setEditingId(null);
@@ -90,18 +84,15 @@ export default function App() {
   };
 
   const handleDelete = async (id: string) => {
-    if (db) {
-      try {
-        await deleteDoc(doc(db, 'kpis', id));
-      } catch (err) {
-        console.error("Error deleting document: ", err);
-        alert("Failed to delete KPI.");
-      }
+    try {
+      await deleteDoc(doc(db, 'kpis', id));
+    } catch (err) {
+      console.error("Error deleting document: ", err);
+      alert("Failed to delete KPI.");
     }
   };
 
   const handleAdd = async () => {
-    if (!db) return;
     const newKpi = {
       name: 'New KPI',
       value: 0,
@@ -124,30 +115,16 @@ export default function App() {
     return Math.min(Math.max((value / target) * 100, 0), 100);
   };
 
-  if (!db || error) {
+  if (error) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Database size={32} />
+          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle size={32} />
           </div>
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Firebase Setup Required</h2>
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Connection Error</h2>
           <p className="text-slate-600 mb-6 text-sm">
-            {error || "To enable real-time syncing, you need to connect this app to a Firebase project."}
-          </p>
-          <div className="text-left bg-slate-50 p-4 rounded-lg border border-slate-200 text-sm font-mono text-slate-700 overflow-x-auto">
-            <p className="font-semibold mb-2 text-slate-900">Required Environment Variables:</p>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>VITE_FIREBASE_API_KEY</li>
-              <li>VITE_FIREBASE_AUTH_DOMAIN</li>
-              <li>VITE_FIREBASE_PROJECT_ID</li>
-              <li>VITE_FIREBASE_STORAGE_BUCKET</li>
-              <li>VITE_FIREBASE_MESSAGING_SENDER_ID</li>
-              <li>VITE_FIREBASE_APP_ID</li>
-            </ul>
-          </div>
-          <p className="mt-6 text-sm text-slate-500">
-            Add these to your environment variables to continue.
+            {error}
           </p>
         </div>
       </div>
