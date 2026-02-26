@@ -131,16 +131,6 @@ export default function App() {
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <div className="animate-spin text-indigo-600">
-          <Factory size={32} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
@@ -150,6 +140,11 @@ export default function App() {
               <Factory size={20} />
             </div>
             <h1 className="text-xl font-semibold tracking-tight text-slate-900">Cement Plant Operations</h1>
+            {loading && (
+              <div className="animate-spin text-indigo-400 ml-2">
+                <Settings size={16} />
+              </div>
+            )}
           </div>
           <button 
             onClick={handleAdd}
