@@ -155,7 +155,7 @@ export default function App() {
             <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-sm">
               <Factory size={20} />
             </div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">Cement Plant Operations</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900">HOLCIM UAE KPIS</h1>
             {loading && (
               <div className="animate-spin text-indigo-400 ml-2">
                 <Settings size={16} />
