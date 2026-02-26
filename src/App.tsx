@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Check, Trash2, Factory, TrendingUp, AlertCircle, Settings, Database } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { collection, onSnapshot, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { ref, onValue, set, remove, push } from 'firebase/database';
 import { db } from './firebase';
 
 type KPI = {
@@ -27,29 +27,32 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const kpisRef = collection(db, 'kpis');
+    const kpisRef = ref(db, 'kpis');
     
     let isTimeout = false;
     const timeoutId = setTimeout(() => {
       isTimeout = true;
-      setError("Could not connect to Firebase. Please ensure you have enabled 'Firestore Database' in your Firebase Console.");
+      setError("Could not connect to Firebase. Please ensure your Realtime Database is set up.");
     }, 5000);
 
-    const unsubscribe = onSnapshot(kpisRef, (snapshot) => {
+    const unsubscribe = onValue(kpisRef, (snapshot) => {
       clearTimeout(timeoutId);
       if (isTimeout) setError(null);
       
-      if (snapshot.empty) {
+      if (!snapshot.exists()) {
         // Seed initial data if empty
+        const initialData: Record<string, any> = {};
         initialKPIs.forEach(kpi => {
           const { id, ...data } = kpi;
-          setDoc(doc(kpisRef, id), data).catch(console.error);
+          initialData[id] = data;
         });
+        set(kpisRef, initialData).catch(console.error);
       } else {
-        const kpiData: KPI[] = [];
-        snapshot.forEach((doc) => {
-          kpiData.push({ id: doc.id, ...doc.data() } as KPI);
-        });
+        const data = snapshot.val();
+        const kpiData: KPI[] = Object.keys(data).map(key => ({
+          id: key,
+          ...data[key]
+        }));
         kpiData.sort((a, b) => a.name.localeCompare(b.name));
         setKpis(kpiData);
       }
@@ -57,7 +60,7 @@ export default function App() {
     }, (err) => {
       clearTimeout(timeoutId);
       console.error(err);
-      setError("Failed to read from Firebase. Please check your Firestore Security Rules (they might be denying read/write access).");
+      setError("Failed to read from Firebase. Please check your Realtime Database Security Rules.");
       setLoading(false);
     });
 
@@ -89,10 +92,10 @@ export default function App() {
 
       try {
         const { id, ...kpiData } = kpiToSave;
-        await setDoc(doc(db, 'kpis', id), kpiData);
+        await set(ref(db, `kpis/${id}`), kpiData);
       } catch (err) {
         console.error("Error saving document: ", err);
-        alert("Failed to save KPI to Firebase. Check your Firestore rules.");
+        alert("Failed to save KPI to Firebase. Check your rules.");
       }
     }
   };
@@ -101,7 +104,7 @@ export default function App() {
     // Optimistic delete
     setKpis(prev => prev.filter(k => k.id !== id));
     try {
-      await deleteDoc(doc(db, 'kpis', id));
+      await remove(ref(db, `kpis/${id}`));
     } catch (err) {
       console.error("Error deleting document: ", err);
       alert("Failed to delete KPI from Firebase.");
@@ -109,7 +112,8 @@ export default function App() {
   };
 
   const handleAdd = () => {
-    const newId = doc(collection(db, 'kpis')).id;
+    const newRef = push(ref(db, 'kpis'));
+    const newId = newRef.key as string;
     const newKpi = {
       id: newId,
       name: 'New KPI',
