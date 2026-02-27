@@ -1,335 +1,349 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Check, Trash2, Factory, TrendingUp, AlertCircle, Settings, Database } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { ref, onValue, set, remove, push } from 'firebase/database';
+import { ShieldAlert, Users, Target, Settings, TrendingUp, Award, Edit2, Save, Plus, Trash2 } from 'lucide-react';
+import { ref, onValue, set } from 'firebase/database';
 import { db } from './firebase';
 
-type KPI = {
+type BoardData = {
+  date: string;
+  title: string;
+  sections: SectionData[];
+}
+
+type SectionData = {
   id: string;
-  name: string;
+  column: number;
+  title: string;
+  icon: string;
+  items: ItemData[];
+}
+
+type ItemData = {
+  id: string;
+  text: string;
+  hasKpi: boolean;
   value: number;
   target: number;
   unit: string;
+}
+
+const initialData: BoardData = {
+  date: "27-Feb 2026",
+  title: "Day to day operations – KNOW OUR PRIORITY",
+  sections: [
+    {
+      id: "s1",
+      column: 1,
+      title: "HEALTH, SAFETY & ENVIRONMENT",
+      icon: "ShieldAlert",
+      items: [
+        { id: "i1", text: "Ensure ZERO harm", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i2", text: "Ensure NO JOBs without SWI / RA", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i3", text: "Report any Safety & Environmental Incident within 24 hrs in iCare", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i4", text: "Any visible dust from main stack or any other process areas, highlight & report to concern team.", hasKpi: false, value: 0, target: 0, unit: "" },
+      ]
+    },
+    {
+      id: "s2",
+      column: 1,
+      title: "Role Specific (Shift CO. CROs & Inspector)",
+      icon: "Users",
+      items: [
+        { id: "i5", text: "Report / update all the stoppage in TIS before you left", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i6", text: "Ensure 100% compliance of 1st level inspection according to the schedule", hasKpi: true, value: 100, target: 100, unit: "%" },
+        { id: "i7", text: "Ensure agreed KPIs are achieved", hasKpi: false, value: 0, target: 0, unit: "" },
+      ]
+    },
+    {
+      id: "s3",
+      column: 2,
+      title: "Our Priorities",
+      icon: "Target",
+      items: [
+        { id: "i8", text: "ZERO HSE Incident", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i9", text: "Stable operation of kiln with > 100% PRI", hasKpi: true, value: 100, target: 100, unit: "%" },
+        { id: "i10", text: "TSR > 35%", hasKpi: true, value: 35, target: 35, unit: "%" },
+        { id: "i11", text: "STEC & SEEC according to the budget", hasKpi: false, value: 0, target: 0, unit: "" },
+      ]
+    },
+    {
+      id: "s4",
+      column: 2,
+      title: "Equipment Operations",
+      icon: "Settings",
+      items: [
+        { id: "i12", text: "Raw Mill\n• Optimize Mill Operations to achieve > 590 tph feed rate", hasKpi: true, value: 590, target: 590, unit: "tph" },
+        { id: "i13", text: "Kiln-Cooler\n• Keep the Kiln feed 513 tph by ensuring the stability of the kiln, feel free to reduce KF to prevent kiln stoppage/ kiln flush", hasKpi: true, value: 513, target: 513, unit: "tph" },
+        { id: "i14", text: "• Ensure optimum operations of the cooler to ensure Clinker temperature < 170 deg C", hasKpi: true, value: 170, target: 170, unit: "deg C" },
+        { id: "i15", text: "Cement Mills\n• Ensure optimum operation of the CMs according to type of Product and agreed quality targets", hasKpi: false, value: 0, target: 0, unit: "" },
+      ]
+    },
+    {
+      id: "s5",
+      column: 3,
+      title: "TSR",
+      icon: "TrendingUp",
+      items: [
+        { id: "i16", text: "Ensure minimum 35% TSR by ensuring the below:", hasKpi: true, value: 35, target: 35, unit: "%" },
+        { id: "i17", text: "- RDF feed rate: 6 tph", hasKpi: true, value: 6, target: 6, unit: "tph" },
+        { id: "i18", text: "- Shredded tire: 7+3 tph", hasKpi: true, value: 10, target: 10, unit: "tph" },
+        { id: "i19", text: "- Sludge at 22 - 23% speed", hasKpi: true, value: 22, target: 23, unit: "%" },
+        { id: "i20", text: "Ensure feeding of CD based on availability / delivery by EGA", hasKpi: false, value: 0, target: 0, unit: "" },
+        { id: "i21", text: "Ensure effective operation of HME system whenever HM Cl > 1.7%", hasKpi: true, value: 1.7, target: 1.7, unit: "%" },
+      ]
+    },
+    {
+      id: "s6",
+      column: 3,
+      title: "CMs and Quality",
+      icon: "Award",
+      items: [
+        { id: "i22", text: "Maintain Raw mill Sieve 16 -17 % @ 90 μm", hasKpi: true, value: 16, target: 17, unit: "%" },
+        { id: "i23", text: "Ensure Clinker free lime within 1.5 -2%", hasKpi: true, value: 1.5, target: 2, unit: "%" },
+        { id: "i24", text: "Ensure fine coal sieve within 9 -11% at 90 μm", hasKpi: true, value: 9, target: 11, unit: "%" },
+      ]
+    }
+  ]
 };
 
-const initialKPIs: KPI[] = [
-  { id: '1', name: 'Kiln Feed', value: 380, target: 400, unit: 't/h' },
-  { id: '2', name: 'Cement Feed', value: 145, target: 150, unit: 't/h' },
-  { id: '3', name: 'MTBF Kiln', value: 320, target: 400, unit: 'hrs' },
-  { id: '4', name: 'MTBF Cement', value: 280, target: 300, unit: 'hrs' },
-];
+const IconMap: Record<string, React.ElementType> = {
+  ShieldAlert,
+  Users,
+  Target,
+  Settings,
+  TrendingUp,
+  Award
+};
 
 export default function App() {
-  const [kpis, setKpis] = useState<KPI[]>(initialKPIs);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<KPI | null>(null);
+  const [data, setData] = useState<BoardData | null>(null);
+  const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const kpisRef = ref(db, 'kpis');
-    
-    let isTimeout = false;
-    const timeoutId = setTimeout(() => {
-      isTimeout = true;
-      setError("Could not connect to Firebase. Please ensure your Realtime Database is set up.");
-    }, 5000);
-
-    const unsubscribe = onValue(kpisRef, (snapshot) => {
-      clearTimeout(timeoutId);
-      if (isTimeout) setError(null);
-      
+    const boardRef = ref(db, 'board/main');
+    const unsubscribe = onValue(boardRef, (snapshot) => {
       if (!snapshot.exists()) {
-        // Seed initial data if empty
-        const initialData: Record<string, any> = {};
-        initialKPIs.forEach(kpi => {
-          const { id, ...data } = kpi;
-          initialData[id] = data;
-        });
-        set(kpisRef, initialData).catch(console.error);
+        set(boardRef, initialData);
       } else {
-        const data = snapshot.val();
-        const kpiData: KPI[] = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        kpiData.sort((a, b) => a.name.localeCompare(b.name));
-        setKpis(kpiData);
+        setData(snapshot.val());
       }
-      setLoading(false);
-    }, (err) => {
-      clearTimeout(timeoutId);
-      console.error(err);
-      setError("Failed to read from Firebase. Please check your Realtime Database Security Rules.");
       setLoading(false);
     });
-
-    return () => {
-      clearTimeout(timeoutId);
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  const handleEdit = (kpi: KPI) => {
-    setEditingId(kpi.id);
-    setEditForm(kpi);
-  };
-
   const handleSave = async () => {
-    if (editForm) {
-      // Optimistic update
-      setKpis(prev => {
-        const exists = prev.find(k => k.id === editForm.id);
-        if (exists) {
-          return prev.map(k => k.id === editForm.id ? editForm : k);
-        }
-        return [...prev, editForm];
-      });
-      
-      const kpiToSave = editForm;
-      setEditingId(null);
-      setEditForm(null);
-
-      try {
-        const { id, ...kpiData } = kpiToSave;
-        await set(ref(db, `kpis/${id}`), kpiData);
-      } catch (err) {
-        console.error("Error saving document: ", err);
-        alert("Failed to save KPI to Firebase. Check your rules.");
-      }
+    if (data) {
+      await set(ref(db, 'board/main'), data);
+      setEditMode(false);
     }
   };
 
-  const handleDelete = async (id: string) => {
-    // Optimistic delete
-    setKpis(prev => prev.filter(k => k.id !== id));
-    try {
-      await remove(ref(db, `kpis/${id}`));
-    } catch (err) {
-      console.error("Error deleting document: ", err);
-      alert("Failed to delete KPI from Firebase.");
-    }
+  const updateItem = (sectionId: string, itemId: string, updates: Partial<ItemData>) => {
+    if (!data) return;
+    setData({
+      ...data,
+      sections: data.sections.map(s => 
+        s.id === sectionId 
+          ? { ...s, items: s.items.map(i => i.id === itemId ? { ...i, ...updates } : i) }
+          : s
+      )
+    });
   };
 
-  const handleAdd = () => {
-    const newRef = push(ref(db, 'kpis'));
-    const newId = newRef.key as string;
-    const newKpi = {
-      id: newId,
-      name: 'New KPI',
+  const addItem = (sectionId: string) => {
+    if (!data) return;
+    const newItem: ItemData = {
+      id: Date.now().toString(),
+      text: "New Item",
+      hasKpi: false,
       value: 0,
-      target: 100,
-      unit: 'unit'
+      target: 0,
+      unit: ""
     };
-    setKpis(prev => [...prev, newKpi]);
-    setEditingId(newId);
-    setEditForm(newKpi);
+    setData({
+      ...data,
+      sections: data.sections.map(s => 
+        s.id === sectionId ? { ...s, items: [...s.items, newItem] } : s
+      )
+    });
   };
 
-  const calculateProgress = (value: number, target: number) => {
-    if (target === 0) return 0;
-    return Math.min(Math.max((value / target) * 100, 0), 100);
+  const removeItem = (sectionId: string, itemId: string) => {
+    if (!data) return;
+    setData({
+      ...data,
+      sections: data.sections.map(s => 
+        s.id === sectionId ? { ...s, items: s.items.filter(i => i.id !== itemId) } : s
+      )
+    });
   };
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertCircle size={32} />
-          </div>
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Connection Error</h2>
-          <p className="text-slate-600 mb-6 text-sm">
-            {error}
-          </p>
-        </div>
-      </div>
-    );
+  if (loading || !data) {
+    return <div className="min-h-screen bg-[#e2e8f0] flex items-center justify-center"><div className="animate-spin text-slate-500"><Settings size={32} /></div></div>;
   }
 
+  const columns = [1, 2, 3];
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 selection:text-indigo-900">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-indigo-600 p-2 rounded-lg text-white shadow-sm">
-              <Factory size={20} />
-            </div>
-            <h1 className="text-xl font-semibold tracking-tight text-slate-900">HOLCIM UAE TARGET</h1>
-            {loading && (
-              <div className="animate-spin text-indigo-400 ml-2">
-                <Settings size={16} />
-              </div>
+    <div className="min-h-screen bg-[#e2e8f0] text-slate-900 font-sans p-4 md:p-8">
+      <div className="max-w-[1600px] mx-auto bg-[#f1f5f9] shadow-2xl rounded-xl overflow-hidden border border-slate-300">
+        
+        {/* Header */}
+        <div className="bg-white px-8 py-6 border-b border-slate-300 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            {editMode ? (
+              <input 
+                className="text-3xl font-light text-slate-800 border-b border-slate-300 focus:outline-none bg-transparent w-[600px]"
+                value={data.title}
+                onChange={e => setData({...data, title: e.target.value})}
+              />
+            ) : (
+              <h1 className="text-3xl font-light text-slate-800 tracking-wide">{data.title}</h1>
             )}
           </div>
-          <button 
-            onClick={handleAdd}
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-          >
-            <Plus size={16} />
-            Add KPI
-          </button>
+          <div className="flex items-center gap-6">
+            <div className="bg-[#60a5fa] text-slate-900 px-6 py-2 text-lg font-medium rounded-sm">
+              {editMode ? (
+                <input 
+                  className="bg-transparent border-b border-slate-800 focus:outline-none w-32 text-center"
+                  value={data.date}
+                  onChange={e => setData({...data, date: e.target.value})}
+                />
+              ) : (
+                data.date
+              )}
+            </div>
+            <button 
+              onClick={editMode ? handleSave : () => setEditMode(true)}
+              className={`p-2 rounded-full transition-colors ${editMode ? 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+              title={editMode ? "Save Changes" : "Edit Dashboard"}
+            >
+              {editMode ? <Save size={24} /> : <Edit2 size={24} />}
+            </button>
+          </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          <AnimatePresence>
-            {kpis.map(kpi => {
-              const isEditing = editingId === kpi.id;
-              const progress = calculateProgress(kpi.value, kpi.target);
-              const isWarning = progress < 80;
-              const maxValue = Math.max(kpi.value, kpi.target);
-              const currentHeight = maxValue === 0 ? 0 : (kpi.value / maxValue) * 100;
-              const targetHeight = maxValue === 0 ? 0 : (kpi.target / maxValue) * 100;
-
-              return (
-                <motion.div 
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  key={kpi.id} 
-                  className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col relative group transition-all hover:shadow-md h-[280px]"
-                >
-                  {isEditing ? (
-                    <div className="flex flex-col h-full">
-                      <div className="mb-4">
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">KPI Name</label>
+        {/* Content Grid */}
+        <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+          {columns.map(colNum => (
+            <div key={colNum} className="flex flex-col gap-8">
+              {data.sections.filter(s => s.column === colNum).map(section => {
+                const Icon = IconMap[section.icon] || Settings;
+                return (
+                  <div key={section.id} className="flex flex-col">
+                    {/* Chevron Header */}
+                    <div 
+                      className="bg-[#1a1c29] text-white p-3 pl-4 relative mb-4 flex items-center gap-3" 
+                      style={{ clipPath: 'polygon(0 0, calc(100% - 20px) 0, 100% 50%, calc(100% - 20px) 100%, 0 100%)' }}
+                    >
+                      <Icon size={24} className="text-slate-300" />
+                      {editMode ? (
                         <input 
-                          type="text" 
-                          value={editForm?.name || ''}
-                          onChange={e => setEditForm(prev => prev ? {...prev, name: e.target.value} : null)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          placeholder="e.g. Kiln Feed"
+                          className="text-lg font-bold tracking-wide bg-transparent border-b border-slate-500 focus:outline-none w-full mr-6"
+                          value={section.title}
+                          onChange={e => {
+                            setData({
+                              ...data,
+                              sections: data.sections.map(s => s.id === section.id ? {...s, title: e.target.value} : s)
+                            });
+                          }}
                         />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Current</label>
-                          <input 
-                            type="number" 
-                            value={editForm?.value || 0}
-                            onChange={e => setEditForm(prev => prev ? {...prev, value: Number(e.target.value)} : null)}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Target</label>
-                          <input 
-                            type="number" 
-                            value={editForm?.target || 0}
-                            onChange={e => setEditForm(prev => prev ? {...prev, target: Number(e.target.value)} : null)}
-                            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-                      <div className="mb-4">
-                        <label className="block text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Unit</label>
-                        <input 
-                          type="text" 
-                          value={editForm?.unit || ''}
-                          onChange={e => setEditForm(prev => prev ? {...prev, unit: e.target.value} : null)}
-                          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                          placeholder="e.g. t/h"
-                        />
-                      </div>
-                      <div className="mt-auto flex items-center justify-between pt-2 border-t border-slate-100">
-                        <button 
-                          onClick={() => handleDelete(kpi.id)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete KPI"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingId(null)}
-                            className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                          >
-                            Cancel
-                          </button>
-                          <button 
-                            onClick={handleSave}
-                            className="px-3 py-1.5 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
-                          >
-                            <Check size={16} /> Save
-                          </button>
-                        </div>
-                      </div>
+                      ) : (
+                        <h2 className="text-lg font-bold tracking-wide">{section.title}</h2>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex flex-col h-full">
-                      <div className="flex justify-between items-start mb-6">
-                        <div className="flex items-center gap-2">
-                          <div className="p-1.5 bg-slate-100 rounded-md text-slate-500">
-                            {kpi.name.toLowerCase().includes('mtbf') ? <Settings size={16} /> : <TrendingUp size={16} />}
-                          </div>
-                          <h3 className="text-sm font-medium text-slate-600 uppercase tracking-wide">{kpi.name}</h3>
-                        </div>
-                        <button 
-                          onClick={() => handleEdit(kpi)}
-                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                      </div>
-                      
-                      <div className="flex-1 flex items-end justify-between gap-4 mb-4">
-                        <div className="flex flex-col gap-1 pb-2">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-light tracking-tight text-slate-900">
-                              {kpi.value}
-                            </span>
-                            <span className="text-sm font-medium text-slate-500">
-                              {kpi.unit}
-                            </span>
-                          </div>
-                          <div className="text-sm text-slate-500 flex items-center gap-1.5">
-                            <span>Target:</span>
-                            <span className="font-medium text-slate-700">{kpi.target} {kpi.unit}</span>
-                          </div>
-                        </div>
 
-                        <div className="flex items-end gap-2 h-24 border-b-2 border-slate-800 pb-0 px-2 w-24 shrink-0 justify-center">
-                          <div 
-                            className="w-6 bg-orange-500 rounded-t-sm transition-all duration-1000 ease-out" 
-                            style={{ height: `${targetHeight}%`, minHeight: '4px' }} 
-                            title={`Target: ${kpi.target}`}
-                          />
-                          <div 
-                            className="w-6 bg-blue-500 rounded-t-sm transition-all duration-1000 ease-out" 
-                            style={{ height: `${currentHeight}%`, minHeight: '4px' }} 
-                            title={`Current: ${kpi.value}`}
-                          />
-                        </div>
-                      </div>
+                    {/* Items */}
+                    <ul className="space-y-4 pl-2">
+                      {section.items.map(item => {
+                        const maxValue = Math.max(item.value, item.target);
+                        const currentHeight = maxValue === 0 ? 0 : (item.value / maxValue) * 100;
+                        const targetHeight = maxValue === 0 ? 0 : (item.target / maxValue) * 100;
 
-                      <div className="mt-auto">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
-                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm"></div> Target</div>
-                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div> Current</div>
-                          </div>
-                          <span className={`text-xs font-bold ${isWarning ? 'text-amber-600' : 'text-emerald-600'}`}>
-                            {progress.toFixed(1)}%
-                          </span>
-                        </div>
-                        {isWarning && (
-                          <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1.5 rounded-md">
-                            <AlertCircle size={14} />
-                            <span>Below target threshold</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+                        return (
+                          <li key={item.id} className="flex flex-col gap-2">
+                            <div className="flex items-start justify-between gap-4 text-sm text-slate-800">
+                              <div className="flex items-start gap-2 flex-1">
+                                <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-slate-800 shrink-0" />
+                                {editMode ? (
+                                  <textarea 
+                                    className="w-full p-2 border border-slate-300 rounded bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[60px]" 
+                                    value={item.text} 
+                                    onChange={e => updateItem(section.id, item.id, { text: e.target.value })}
+                                  />
+                                ) : (
+                                  <span className="leading-relaxed whitespace-pre-line">{item.text}</span>
+                                )}
+                              </div>
+                              
+                              {item.hasKpi && !editMode && (
+                                <div className="flex items-center gap-3 shrink-0 bg-white p-2 rounded shadow-sm border border-slate-200">
+                                  <div className="text-right">
+                                    <div className="font-bold text-lg leading-none text-slate-900">{item.value}</div>
+                                    <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">tgt: {item.target} {item.unit}</div>
+                                  </div>
+                                  <div className="flex items-end gap-1 h-10 w-8 border-b border-slate-400 justify-center pb-0.5">
+                                    <div className="w-2.5 bg-orange-500 rounded-t-sm transition-all" style={{ height: `${targetHeight}%`, minHeight: '2px' }} title={`Target: ${item.target}`} />
+                                    <div className="w-2.5 bg-blue-500 rounded-t-sm transition-all" style={{ height: `${currentHeight}%`, minHeight: '2px' }} title={`Current: ${item.value}`} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {editMode && (
+                              <div className="ml-3.5 bg-slate-200 p-3 rounded-md flex flex-col gap-3">
+                                <div className="flex items-center justify-between">
+                                  <label className="flex items-center gap-2 text-sm font-medium">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={item.hasKpi}
+                                      onChange={e => updateItem(section.id, item.id, { hasKpi: e.target.checked })}
+                                    />
+                                    Show KPI Bars
+                                  </label>
+                                  <button onClick={() => removeItem(section.id, item.id)} className="text-red-500 hover:bg-red-100 p-1 rounded">
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                                
+                                {item.hasKpi && (
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <label className="block text-xs text-slate-500 mb-1">Current</label>
+                                      <input type="number" className="w-full p-1 text-sm border rounded" value={item.value} onChange={e => updateItem(section.id, item.id, { value: Number(e.target.value) })} />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-slate-500 mb-1">Target</label>
+                                      <input type="number" className="w-full p-1 text-sm border rounded" value={item.target} onChange={e => updateItem(section.id, item.id, { target: Number(e.target.value) })} />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs text-slate-500 mb-1">Unit</label>
+                                      <input type="text" className="w-full p-1 text-sm border rounded" value={item.unit} onChange={e => updateItem(section.id, item.id, { unit: e.target.value })} />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    {editMode && (
+                      <button 
+                        onClick={() => addItem(section.id)}
+                        className="mt-4 ml-3.5 flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        <Plus size={16} /> Add Item
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      </main>
+      </div>
     </div>
   );
 }
