@@ -179,6 +179,9 @@ export default function App() {
               const isEditing = editingId === kpi.id;
               const progress = calculateProgress(kpi.value, kpi.target);
               const isWarning = progress < 80;
+              const maxValue = Math.max(kpi.value, kpi.target);
+              const currentHeight = maxValue === 0 ? 0 : (kpi.value / maxValue) * 100;
+              const targetHeight = maxValue === 0 ? 0 : (kpi.target / maxValue) * 100;
 
               return (
                 <motion.div 
@@ -272,36 +275,48 @@ export default function App() {
                         </button>
                       </div>
                       
-                      <div className="flex flex-col gap-1 mb-8">
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-5xl font-light tracking-tight text-slate-900">
-                            {kpi.value}
-                          </span>
-                          <span className="text-lg font-medium text-slate-500">
-                            {kpi.unit}
-                          </span>
+                      <div className="flex-1 flex items-end justify-between gap-4 mb-4">
+                        <div className="flex flex-col gap-1 pb-2">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-light tracking-tight text-slate-900">
+                              {kpi.value}
+                            </span>
+                            <span className="text-sm font-medium text-slate-500">
+                              {kpi.unit}
+                            </span>
+                          </div>
+                          <div className="text-sm text-slate-500 flex items-center gap-1.5">
+                            <span>Target:</span>
+                            <span className="font-medium text-slate-700">{kpi.target} {kpi.unit}</span>
+                          </div>
                         </div>
-                        <div className="text-sm text-slate-500 flex items-center gap-1.5">
-                          <span>Target:</span>
-                          <span className="font-medium text-slate-700">{kpi.target} {kpi.unit}</span>
+
+                        <div className="flex items-end gap-2 h-24 border-b-2 border-slate-800 pb-0 px-2 w-24 shrink-0 justify-center">
+                          <div 
+                            className="w-6 bg-orange-500 rounded-t-sm transition-all duration-1000 ease-out" 
+                            style={{ height: `${targetHeight}%`, minHeight: '4px' }} 
+                            title={`Target: ${kpi.target}`}
+                          />
+                          <div 
+                            className="w-6 bg-blue-500 rounded-t-sm transition-all duration-1000 ease-out" 
+                            style={{ height: `${currentHeight}%`, minHeight: '4px' }} 
+                            title={`Current: ${kpi.value}`}
+                          />
                         </div>
                       </div>
 
                       <div className="mt-auto">
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">Progress</span>
+                          <div className="flex items-center gap-3 text-xs font-medium text-slate-500">
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 bg-orange-500 rounded-sm"></div> Target</div>
+                            <div className="flex items-center gap-1"><div className="w-2.5 h-2.5 bg-blue-500 rounded-sm"></div> Current</div>
+                          </div>
                           <span className={`text-xs font-bold ${isWarning ? 'text-amber-600' : 'text-emerald-600'}`}>
                             {progress.toFixed(1)}%
                           </span>
                         </div>
-                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-1000 ease-out ${isWarning ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                            style={{ width: `${progress}%` }}
-                          />
-                        </div>
                         {isWarning && (
-                          <div className="mt-3 flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1.5 rounded-md">
+                          <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1.5 rounded-md">
                             <AlertCircle size={14} />
                             <span>Below target threshold</span>
                           </div>
