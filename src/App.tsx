@@ -179,6 +179,31 @@ export default function App() {
     });
   };
 
+  const addSection = (column: number) => {
+    if (!data) return;
+    const newSection: SectionData = {
+      id: Date.now().toString(),
+      column,
+      title: "New Section",
+      icon: "Settings",
+      items: []
+    };
+    setData({
+      ...data,
+      sections: [...data.sections, newSection]
+    });
+  };
+
+  const removeSection = (sectionId: string) => {
+    if (!data) return;
+    if (window.confirm("Are you sure you want to delete this entire section?")) {
+      setData({
+        ...data,
+        sections: data.sections.filter(s => s.id !== sectionId)
+      });
+    }
+  };
+
   if (loading || !data) {
     return <div className="min-h-screen bg-[#e2e8f0] flex items-center justify-center"><div className="animate-spin text-slate-500"><Settings size={32} /></div></div>;
   }
@@ -239,16 +264,25 @@ export default function App() {
                     >
                       <Icon size={24} className="text-slate-300" />
                       {editMode ? (
-                        <input 
-                          className="text-lg font-bold tracking-wide bg-transparent border-b border-slate-500 focus:outline-none w-full mr-6"
-                          value={section.title}
-                          onChange={e => {
-                            setData({
-                              ...data,
-                              sections: data.sections.map(s => s.id === section.id ? {...s, title: e.target.value} : s)
-                            });
-                          }}
-                        />
+                        <>
+                          <input 
+                            className="text-lg font-bold tracking-wide bg-transparent border-b border-slate-500 focus:outline-none w-full mr-12"
+                            value={section.title}
+                            onChange={e => {
+                              setData({
+                                ...data,
+                                sections: data.sections.map(s => s.id === section.id ? {...s, title: e.target.value} : s)
+                              });
+                            }}
+                          />
+                          <button 
+                            onClick={() => removeSection(section.id)}
+                            className="absolute right-8 text-red-400 hover:text-red-300 p-1"
+                            title="Delete Section"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </>
                       ) : (
                         <h2 className="text-lg font-bold tracking-wide">{section.title}</h2>
                       )}
@@ -340,6 +374,14 @@ export default function App() {
                   </div>
                 );
               })}
+              {editMode && (
+                <button 
+                  onClick={() => addSection(colNum)}
+                  className="flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors mt-4"
+                >
+                  <Plus size={20} /> Add Section
+                </button>
+              )}
             </div>
           ))}
         </div>
