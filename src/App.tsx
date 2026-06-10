@@ -118,18 +118,43 @@ export default function App() {
   const [data, setData] = useState<BoardData | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const boardRef = ref(db, 'board/main');
+    
+    let isTimeout = false;
+    const timeoutId = setTimeout(() => {
+      isTimeout = true;
+      setError("Could not connect to Firebase. Please check your setup.");
+      setLoading(false);
+    }, 5000);
+
     const unsubscribe = onValue(boardRef, (snapshot) => {
+      clearTimeout(timeoutId);
+      if (isTimeout) setError(null);
+      
       if (!snapshot.exists()) {
-        set(boardRef, initialData);
+        set(boardRef, initialData).catch(err => {
+          console.error(err);
+          setError("Permission denied to create initial data. Please check your Firebase rules.");
+          setLoading(false);
+        });
       } else {
         setData(snapshot.val());
+        setLoading(false);
       }
+    }, (err) => {
+      clearTimeout(timeoutId);
+      console.error(err);
+      setError("Failed to read from Firebase. Please check your Realtime Database Security Rules.");
       setLoading(false);
     });
-    return () => unsubscribe();
+    
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const handleSave = async () => {
@@ -203,6 +228,29 @@ export default function App() {
       });
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#e2e8f0] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-xl shadow-lg border border-slate-300 p-8 text-center flex flex-col items-center">
+          <ShieldAlert size={48} className="text-red-500 mb-4" />
+          <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Error</h2>
+          <p className="text-slate-600 mb-6">{error}</p>
+          <div className="text-left bg-slate-100 p-4 rounded-md w-full text-xs text-slate-700 font-mono overflow-auto">
+            <p className="font-bold mb-1">Make sure your rules are set to:</p>
+            <pre>
+{`{
+  "rules": {
+    ".read": "now < 1774641600000",
+    ".write": "now < 1774641600000"
+  }
+}`}
+            </pre>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading || !data) {
     return <div className="min-h-screen bg-[#e2e8f0] flex items-center justify-center"><div className="animate-spin text-slate-500"><Settings size={32} /></div></div>;
