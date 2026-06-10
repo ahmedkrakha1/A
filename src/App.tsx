@@ -237,15 +237,17 @@ export default function App() {
           <h2 className="text-xl font-bold text-slate-800 mb-2">Connection Error</h2>
           <p className="text-slate-600 mb-6">{error}</p>
           <div className="text-left bg-slate-100 p-4 rounded-md w-full text-xs text-slate-700 font-mono overflow-auto">
-            <p className="font-bold mb-1">Make sure your rules are set to:</p>
+            <p className="font-bold mb-1">Your test rules have likely expired based on the date.</p>
+            <p className="mb-2">Please update your rules to the following to restore access:</p>
             <pre>
 {`{
   "rules": {
-    ".read": "now < 1774641600000",
-    ".write": "now < 1774641600000"
+    ".read": true,
+    ".write": true
   }
 }`}
             </pre>
+            <p className="mt-2 text-amber-600">Note: True allows open read/write access. Ensure no sensitive data is in the DB.</p>
           </div>
         </div>
       </div>
